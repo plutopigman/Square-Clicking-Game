@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Square Click Game</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #dff6ff, #fef6e4);
+      color: #111827;
+    }
+
+    .layout {
+      width: min(1100px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .game {
+      text-align: center;
+    }
+
+    h1,
+    h2 {
+      margin-top: 0;
+      color: #1f2937;
+    }
+
+    .status {
+      margin-bottom: 16px;
+      min-height: 1.5rem;
+      font-size: 1.05rem;
+      color: #475569;
+    }
+
+    .hud {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 16px;
+      font-size: 1.15rem;
+      font-weight: bold;
+      flex-wrap: wrap;
+    }
+
+    .play-area {
+      position: relative;
+      width: 100%;
+      height: 70vh;
+      min-height: 420px;
+      border: 3px solid #1f2937;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+    }
+
+    .target {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border: none;
+      border-radius: 10px;
+      background: #ef4444;
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+
+    .target:hover {
+      transform: scale(1.08);
+    }
+
+    .target:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    .scoreboard {
+      padding: 20px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+      text-align: left;
+    }
+
+    .scoreboard ol {
+      margin: 0;
+      padding-left: 24px;
+    }
+
+    .scoreboard li {
+      margin-bottom: 10px;
+      font-weight: bold;
+      color: #1f2937;
+    }
+
+    .empty-score {
+      color: #64748b;
+      font-weight: normal;
+    }
+
+    @media (max-width: 800px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .scoreboard {
+        order: -1;
+      }
+
+      .play-area {
+        min-height: 360px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <main class="game">
+      <h1>Square Click Game</h1>
+      <div class="status" id="statusMessage">Click the square to start.</div>
+      <div class="hud">
+        <div>Score: <span id="score">0</span></div>
+        <div>Time: <span id="timeLeft">15</span>s</div>
+      </div>
+      <div class="play-area" id="playArea">
+        <button class="target" id="target" aria-label="Click the square"></button>
+      </div>
+    </main>
+
+    <aside class="scoreboard">
+      <h2>Top 5 Scores</h2>
+      <ol id="scoreboardList"></ol>
+    </aside>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
+  <script>
+    const playArea = document.getElementById("playArea");
+    const target = document.getElementById("target");
+    const scoreDisplay = document.getElementById("score");
+    const timeLeftDisplay = document.getElementById("timeLeft");
+    const statusMessage = document.getElementById("statusMessage");
+    const scoreboardList = document.getElementById("scoreboardList");
+
+    const targetSize = 60;
+    const roundLength = 15;
+    const scoresCollectionName = "scores";
+
+    let score = 0;
+    let timeLeft = roundLength;
+    let timerId = null;
+    let gameStarted = false;
+    let gameOver = false;
+    let topScores = [];
+    let db = null;
+
+    // Paste your entire firebaseConfig object right here, replacing the placeholder values below.
+    const firebaseConfig = {
+      apiKey: "PASTE_YOUR_API_KEY_HERE",
+      authDomain: "PASTE_YOUR_AUTH_DOMAIN_HERE",
+      projectId: "PASTE_YOUR_PROJECT_ID_HERE",
+      storageBucket: "PASTE_YOUR_STORAGE_BUCKET_HERE",
+      messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID_HERE",
+      appId: "PASTE_YOUR_APP_ID_HERE"
+    };
+
+    function hasRealFirebaseConfig() {
+      return Object.values(firebaseConfig).every(
+        (value) => typeof value === "string" && !value.startsWith("PASTE_YOUR_")
+      );
+    }
+
+    function renderTimer() {
+      timeLeftDisplay.textContent = timeLeft;
+    }
+
+    function renderScore() {
+      scoreDisplay.textContent = score;
+    }
+
+    function renderScoreboard() {
+      scoreboardList.innerHTML = "";
+
+      if (topScores.length === 0) {
+        const emptyItem = document.createElement("li");
+        emptyItem.className = "empty-score";
+        emptyItem.textContent = "No scores yet";
+        scoreboardList.appendChild(emptyItem);
+        return;
+      }
+
+      topScores.forEach((entry) => {
+        const item = document.createElement("li");
+        item.textContent = entry.name + " - " + entry.score;
+        scoreboardList.appendChild(item);
+      });
+    }
+
+    function qualifiesForTopFive(finalScore) {
+      if (topScores.length < 5) {
+        return true;
+      }
+
+      return finalScore > topScores[topScores.length - 1].score;
+    }
+
+    function setupFirestore() {
+      if (!hasRealFirebaseConfig()) {
+        statusMessage.textContent = "Click the square to start. Paste your firebaseConfig to enable the global Top 5.";
+        renderScoreboard();
+        return;
+      }
+
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+
+      db.collection(scoresCollectionName)
+        .orderBy("score", "desc")
+        .limit(5)
+        .onSnapshot(
+          (snapshot) => {
+            topScores = snapshot.docs.map((doc) => {
+              const data = doc.data();
+              return {
+                name: data.name || "Anonymous",
+                score: Number(data.score) || 0
+              };
+            });
+            renderScoreboard();
+          },
+          (error) => {
+            statusMessage.textContent = "Firestore could not load the Top 5. Check your firebaseConfig and rules.";
+            console.error(error);
+          }
+        );
+    }
+
+    function saveScore(playerName, finalScore) {
+      if (!db) {
+        statusMessage.textContent = "Score not saved because Firebase is not configured yet.";
+        return Promise.resolve();
+      }
+
+      return db.collection(scoresCollectionName).add({
+        name: playerName,
+        score: finalScore,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    function moveTarget() {
+      if (gameOver) {
+        return;
+      }
+
+      const maxX = playArea.clientWidth - targetSize;
+      const maxY = playArea.clientHeight - targetSize;
+      const randomX = Math.floor(Math.random() * Math.max(maxX, 1));
+      const randomY = Math.floor(Math.random() * Math.max(maxY, 1));
+
+      target.style.left = randomX + "px";
+      target.style.top = randomY + "px";
+    }
+
+    function finishGame() {
+      if (gameOver) {
+        return;
+      }
+
+      gameOver = true;
+      window.clearInterval(timerId);
+      target.disabled = true;
+
+      if (qualifiesForTopFive(score)) {
+        const enteredName = window.prompt("You made the Top 5! Enter your name:", "Player");
+        const playerName = enteredName === null ? "Anonymous" : enteredName.trim() || "Anonymous";
+        saveScore(playerName, score)
+          .then(() => {
+            statusMessage.textContent = "Game over. " + playerName + " entered the global Top 5 with " + score + ".";
+          })
+          .catch((error) => {
+            statusMessage.textContent = "Game over, but the score could not be saved to Firestore.";
+            console.error(error);
+          });
+        return;
+      }
+
+      statusMessage.textContent = "Game over. Final score: " + score + ".";
+    }
+
+    function startTimer() {
+      if (gameStarted) {
+        return;
+      }
+
+      gameStarted = true;
+      statusMessage.textContent = "Go!";
+
+      timerId = window.setInterval(() => {
+        timeLeft -= 1;
+        renderTimer();
+
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          renderTimer();
+          finishGame();
+        }
+      }, 1000);
+    }
+
+    target.addEventListener("click", () => {
+      if (gameOver) {
+        return;
+      }
+
+      if (!gameStarted) {
+        startTimer();
+      }
+
+      score += 1;
+      renderScore();
+      moveTarget();
+    });
+
+    renderScoreboard();
+    renderScore();
+    renderTimer();
+    setupFirestore();
+    window.addEventListener("load", moveTarget);
+    window.addEventListener("resize", moveTarget);
+  </script>
+</body>
+</html>
