@@ -47,6 +47,11 @@
       color: #475569;
     }
 
+    .connection-status {
+      margin-bottom: 8px;
+      color: #b45309;
+    }
+
     .game-status {
       margin-bottom: 16px;
     }
@@ -93,6 +98,7 @@
         inset 0 -4px 10px rgba(127, 29, 29, 0.3);
       cursor: pointer;
       transition:
+        transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
         box-shadow 0.2s ease,
         filter 0.2s ease;
       will-change: transform;
@@ -185,6 +191,7 @@
   <div class="layout">
     <main class="game">
       <h1>Square Click Game</h1>
+      <div class="status connection-status" id="connectionMessage"></div>
       <div class="status game-status" id="statusMessage">Click the square to start.</div>
       <div class="hud">
         <div>Score: <span id="score">0</span></div>
@@ -209,6 +216,7 @@
     const target = document.getElementById("target");
     const scoreDisplay = document.getElementById("score");
     const timeLeftDisplay = document.getElementById("timeLeft");
+    const connectionMessage = document.getElementById("connectionMessage");
     const statusMessage = document.getElementById("statusMessage");
     const scoreboardList = document.getElementById("scoreboardList");
     const replayButton = document.getElementById("replayButton");
@@ -255,109 +263,6 @@
 
     function renderScore() {
       scoreDisplay.textContent = score;
-    }
-
-    function setTargetPosition(x, y) {
-      currentX = x;
-      currentY = y;
-      target.style.transform = "translate(" + x + "px, " + y + "px)";
-    }
-
-    function getMovementBounds() {
-      return {
-        maxX: Math.max(playArea.clientWidth - targetSize, 0),
-        maxY: Math.max(playArea.clientHeight - targetSize, 0)
-      };
-    }
-
-    function clamp(value, min, max) {
-      return Math.min(Math.max(value, min), max);
-    }
-
-    function randomBetween(min, max) {
-      return min + (Math.random() * (max - min));
-    }
-
-    function getRandomTargetPosition() {
-      const bounds = getMovementBounds();
-
-      return {
-        x: Math.floor(Math.random() * Math.max(bounds.maxX, 1)),
-        y: Math.floor(Math.random() * Math.max(bounds.maxY, 1))
-      };
-    }
-
-    function getRandomControlPoint(startX, startY, nextX, nextY) {
-      const bounds = getMovementBounds();
-      const deltaX = nextX - startX;
-      const deltaY = nextY - startY;
-      const distance = Math.hypot(deltaX, deltaY) || 1;
-      const midX = (startX + nextX) / 2;
-      const midY = (startY + nextY) / 2;
-      const tangentX = deltaX / distance;
-      const tangentY = deltaY / distance;
-      const perpendicularX = -deltaY / distance;
-      const perpendicularY = deltaX / distance;
-      const maxArcHeight = Math.min(150, Math.max(45, distance * 0.5));
-      const minArcHeight = Math.min(40, maxArcHeight * 0.45);
-
-      for (let attempt = 0; attempt < 8; attempt += 1) {
-        const arcDirection = Math.random() < 0.5 ? -1 : 1;
-        const arcHeight = randomBetween(minArcHeight, maxArcHeight) * arcDirection;
-        const tangentShift = randomBetween(-distance * 0.2, distance * 0.2);
-        const controlX = midX + (perpendicularX * arcHeight) + (tangentX * tangentShift);
-        const controlY = midY + (perpendicularY * arcHeight) + (tangentY * tangentShift);
-
-        if (
-          controlX >= 0
-          && controlX <= bounds.maxX
-          && controlY >= 0
-          && controlY <= bounds.maxY
-        ) {
-          return { x: controlX, y: controlY };
-        }
-      }
-
-      return {
-        x: clamp(midX, 0, bounds.maxX),
-        y: clamp(midY, 0, bounds.maxY)
-      };
-    }
-
-    function animateTargetTo(nextX, nextY) {
-      if (target.moveAnimationFrame) {
-        window.cancelAnimationFrame(target.moveAnimationFrame);
-      }
-
-      const startX = currentX;
-      const startY = currentY;
-      const controlPoint = getRandomControlPoint(startX, startY, nextX, nextY);
-      const startTime = performance.now();
-
-      function step(timestamp) {
-        const elapsed = timestamp - startTime;
-        const linearProgress = Math.min(elapsed / motionDurationMs, 1);
-        const easedProgress = 1 - Math.pow(1 - linearProgress, 3);
-        const inverse = 1 - easedProgress;
-        const x = (inverse * inverse * startX)
-          + (2 * inverse * easedProgress * controlPoint.x)
-          + (easedProgress * easedProgress * nextX);
-        const y = (inverse * inverse * startY)
-          + (2 * inverse * easedProgress * controlPoint.y)
-          + (easedProgress * easedProgress * nextY);
-
-        setTargetPosition(x, y);
-
-        if (linearProgress < 1) {
-          target.moveAnimationFrame = window.requestAnimationFrame(step);
-          return;
-        }
-
-        target.moveAnimationFrame = null;
-        setTargetPosition(nextX, nextY);
-      }
-
-      target.moveAnimationFrame = window.requestAnimationFrame(step);
     }
 
     function renderScoreboard() {
@@ -436,6 +341,7 @@
     function setupFirestore() {
       if (!hasRealFirebaseConfig()) {
         usingFirestore = false;
+        connectionMessage.textContent = "Firebase not connected yet. Scores are local only.";
         loadLocalScores();
         return;
       }
@@ -446,6 +352,7 @@
           : firebase.initializeApp(firebaseConfig);
         db = app.firestore ? app.firestore() : firebase.firestore();
         usingFirestore = true;
+        connectionMessage.textContent = "Firebase connected. Top 5 scores are global.";
 
         unsubscribeScores = db.collection(scoresCollectionName)
           .orderBy("score", "desc")
@@ -465,12 +372,14 @@
             },
             (error) => {
               usingFirestore = false;
+              connectionMessage.textContent = "Firebase not connected yet. Scores are local only.";
               loadLocalScores();
               console.error(error);
             }
           );
       } catch (error) {
         usingFirestore = false;
+        connectionMessage.textContent = "Firebase not connected yet. Scores are local only.";
         loadLocalScores();
         console.error(error);
       }
@@ -490,27 +399,26 @@
         })
         .catch((error) => {
           usingFirestore = false;
+          connectionMessage.textContent = "Firebase not connected yet. Scores are local only.";
           addLocalScore(playerName, finalScore);
           throw error;
         });
     }
 
-    function moveTarget(useCurve) {
+    function moveTarget() {
       if (gameOver) {
         return;
       }
 
-      const nextPosition = getRandomTargetPosition();
+      const maxX = playArea.clientWidth - targetSize;
+      const maxY = playArea.clientHeight - targetSize;
+      const randomX = Math.floor(Math.random() * Math.max(maxX, 1));
+      const randomY = Math.floor(Math.random() * Math.max(maxY, 1));
+
+      currentX = randomX;
+      currentY = randomY;
       target.classList.add("running");
-      if (useCurve) {
-        animateTargetTo(nextPosition.x, nextPosition.y);
-      } else {
-        if (target.moveAnimationFrame) {
-          window.cancelAnimationFrame(target.moveAnimationFrame);
-          target.moveAnimationFrame = null;
-        }
-        setTargetPosition(nextPosition.x, nextPosition.y);
-      }
+      target.style.transform = "translate(" + currentX + "px, " + currentY + "px)";
       window.clearTimeout(target.moveEffectTimeout);
       target.moveEffectTimeout = window.setTimeout(() => {
         target.classList.remove("running");
@@ -567,10 +475,6 @@
     function resetGame() {
       window.clearInterval(timerId);
       window.clearTimeout(target.moveEffectTimeout);
-      if (target.moveAnimationFrame) {
-        window.cancelAnimationFrame(target.moveAnimationFrame);
-        target.moveAnimationFrame = null;
-      }
       score = 0;
       timeLeft = roundLength;
       timerId = null;
@@ -581,7 +485,7 @@
       statusMessage.textContent = "Click the square to start.";
       renderScore();
       renderTimer();
-      moveTarget(false);
+      moveTarget();
     }
 
     target.addEventListener("click", () => {
@@ -595,7 +499,7 @@
 
       score += 1;
       renderScore();
-      moveTarget(true);
+      moveTarget();
     });
 
     replayButton.addEventListener("click", resetGame);
@@ -604,8 +508,8 @@
     renderScore();
     renderTimer();
     setupFirestore();
-    window.addEventListener("load", () => moveTarget(false));
-    window.addEventListener("resize", () => moveTarget(false));
+    window.addEventListener("load", moveTarget);
+    window.addEventListener("resize", moveTarget);
   </script>
 </body>
 </html>
