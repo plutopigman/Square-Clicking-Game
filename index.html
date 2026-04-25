@@ -352,7 +352,7 @@
           : firebase.initializeApp(firebaseConfig);
         db = app.firestore ? app.firestore() : firebase.firestore();
         usingFirestore = true;
-        connectionMessage.textContent = "Firebase connected. Top 5 scores are global.";
+        //connectionMessage.textContent = "Firebase connected. Top 5 scores are global.";       remove this line in order to hide text 
 
         unsubscribeScores = db.collection(scoresCollectionName)
           .orderBy("score", "desc")
