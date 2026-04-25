@@ -221,7 +221,9 @@
     const roundLength = 15;
     const scoresCollectionName = "scores";
     const localScoresKey = "square-click-top-5-local";
+    const scoreboardClearedKey = "square-click-scoreboard-cleared-v1";
     const motionDurationMs = 350;
+    const spiralDurationMaxMs = 900;
 
     let score = 0;
     let timeLeft = roundLength;
@@ -234,6 +236,7 @@
     let unsubscribeScores = null;
     let currentX = 0;
     let currentY = 0;
+    let useSpiralPathNext = false;
 
     // Real Firebase config detected below. If this object is ever removed,
     // replace it with your real project config instead of placeholder values.
@@ -246,20 +249,6 @@
       appId: "1:724285223780:web:0908ed42d3e80dbbf6c071",
       measurementId: "G-CJ8QPHYMVE"
     };
-
-    //================================reset scoreboard====================================
-    /*
-    import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
-
-      async function resetScores() {
-      const querySnapshot = await getDocs(collection(db, "scores"));
-      querySnapshot.forEach(async (document) => {
-      await deleteDoc(doc(db, "scores", document.id));
-      });
-    }
-    */
-    //=====================================================================================
-resetScores();
 
     function hasRealFirebaseConfig() {
       return Object.values(firebaseConfig).every(
@@ -305,26 +294,26 @@ resetScores();
       };
     }
 
-    function getRandomControlPoint(startX, startY, nextX, nextY) {
+    function getRandomCurveControlPoint(startX, startY, nextX, nextY) {
       const bounds = getMovementBounds();
       const deltaX = nextX - startX;
       const deltaY = nextY - startY;
       const distance = Math.hypot(deltaX, deltaY) || 1;
-      const midX = (startX + nextX) / 2;
-      const midY = (startY + nextY) / 2;
+      const midpointX = (startX + nextX) / 2;
+      const midpointY = (startY + nextY) / 2;
       const tangentX = deltaX / distance;
       const tangentY = deltaY / distance;
       const perpendicularX = -deltaY / distance;
       const perpendicularY = deltaX / distance;
-      const maxArcHeight = Math.min(150, Math.max(45, distance * 0.5));
-      const minArcHeight = Math.min(40, maxArcHeight * 0.45);
+      const maxCurveOffset = Math.min(140, Math.max(40, distance * 0.45));
+      const minCurveOffset = Math.max(24, maxCurveOffset * 0.45);
 
-      for (let attempt = 0; attempt < 8; attempt += 1) {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
         const arcDirection = Math.random() < 0.5 ? -1 : 1;
-        const arcHeight = randomBetween(minArcHeight, maxArcHeight) * arcDirection;
-        const tangentShift = randomBetween(-distance * 0.2, distance * 0.2);
-        const controlX = midX + (perpendicularX * arcHeight) + (tangentX * tangentShift);
-        const controlY = midY + (perpendicularY * arcHeight) + (tangentY * tangentShift);
+        const curveOffset = randomBetween(minCurveOffset, maxCurveOffset) * arcDirection;
+        const tangentShift = randomBetween(-distance * 0.18, distance * 0.18);
+        const controlX = midpointX + (perpendicularX * curveOffset) + (tangentX * tangentShift);
+        const controlY = midpointY + (perpendicularY * curveOffset) + (tangentY * tangentShift);
 
         if (
           controlX >= 0
@@ -337,24 +326,139 @@ resetScores();
       }
 
       return {
-        x: clamp(midX, 0, bounds.maxX),
-        y: clamp(midY, 0, bounds.maxY)
+        x: clamp(midpointX, 0, bounds.maxX),
+        y: clamp(midpointY, 0, bounds.maxY)
       };
     }
 
-    function animateTargetTo(nextX, nextY) {
+    function normalizeAngle(angle) {
+      const fullTurn = Math.PI * 2;
+      let normalized = angle % fullTurn;
+
+      if (normalized < 0) {
+        normalized += fullTurn;
+      }
+
+      return normalized;
+    }
+
+    function getShortestAngleDelta(startAngle, endAngle, direction) {
+      const fullTurn = Math.PI * 2;
+      const normalizedStart = normalizeAngle(startAngle);
+      const normalizedEnd = normalizeAngle(endAngle);
+
+      if (direction > 0) {
+        return normalizedEnd >= normalizedStart
+          ? normalizedEnd - normalizedStart
+          : (fullTurn - normalizedStart) + normalizedEnd;
+      }
+
+      return normalizedEnd <= normalizedStart
+        ? normalizedEnd - normalizedStart
+        : -((fullTurn - normalizedEnd) + normalizedStart);
+    }
+
+    function pathFitsBounds(profile) {
+      const sampleCount = 24;
+
+      for (let sampleIndex = 0; sampleIndex <= sampleCount; sampleIndex += 1) {
+        const progress = sampleIndex / sampleCount;
+        const angle = profile.startAngle + (profile.sweepAngle * progress);
+        const x = profile.centerX + (Math.cos(angle) * profile.radius);
+        const y = profile.centerY + (Math.sin(angle) * profile.radius);
+
+        if (
+          x < 0
+          || x > profile.bounds.maxX
+          || y < 0
+          || y > profile.bounds.maxY
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    function getRandomOrbitProfile(startX, startY, nextX, nextY) {
+      const bounds = getMovementBounds();
+      const deltaX = nextX - startX;
+      const deltaY = nextY - startY;
+      const distance = Math.hypot(deltaX, deltaY);
+
+      if (distance < 1) {
+        return {
+          bounds,
+          centerX: startX,
+          centerY: startY,
+          radius: 0,
+          startAngle: 0,
+          sweepAngle: 0
+        };
+      }
+
+      const midpointX = (startX + nextX) / 2;
+      const midpointY = (startY + nextY) / 2;
+      const perpendicularX = -deltaY / distance;
+      const perpendicularY = deltaX / distance;
+      const minRadius = Math.max(distance / 2 + 8, 40);
+      const maxRadius = Math.max(minRadius + 10, Math.min(220, distance * 1.35));
+      const extraTurns = Math.random() < 0.7 ? 1 : 2;
+
+      for (let attempt = 0; attempt < 18; attempt += 1) {
+        const radius = randomBetween(minRadius, maxRadius);
+        const offsetFromMidpoint = Math.sqrt(Math.max((radius * radius) - ((distance * distance) / 4), 0));
+        const direction = Math.random() < 0.5 ? -1 : 1;
+        const centerSide = Math.random() < 0.5 ? -1 : 1;
+        const centerX = midpointX + (perpendicularX * offsetFromMidpoint * centerSide);
+        const centerY = midpointY + (perpendicularY * offsetFromMidpoint * centerSide);
+        const startAngle = Math.atan2(startY - centerY, startX - centerX);
+        const endAngle = Math.atan2(nextY - centerY, nextX - centerX);
+        const baseSweep = getShortestAngleDelta(startAngle, endAngle, direction);
+        const sweepAngle = baseSweep + (direction * extraTurns * Math.PI * 2);
+        const profile = {
+          bounds,
+          centerX,
+          centerY,
+          radius,
+          startAngle,
+          sweepAngle
+        };
+
+        if (pathFitsBounds(profile)) {
+          return profile;
+        }
+      }
+
+      return {
+        bounds,
+        centerX: midpointX,
+        centerY: midpointY,
+        radius: distance / 2,
+        startAngle: Math.atan2(startY - midpointY, startX - midpointX),
+        sweepAngle: Math.PI
+      };
+    }
+
+    function getSpiralDuration(profile) {
+      const radiusFactor = clamp(profile.radius / 220, 0, 1);
+      return Math.round(motionDurationMs + ((spiralDurationMaxMs - motionDurationMs) * radiusFactor));
+    }
+
+    function animateTargetAlongCurve(nextX, nextY) {
       if (target.moveAnimationFrame) {
         window.cancelAnimationFrame(target.moveAnimationFrame);
       }
 
       const startX = currentX;
       const startY = currentY;
-      const controlPoint = getRandomControlPoint(startX, startY, nextX, nextY);
+      const controlPoint = getRandomCurveControlPoint(startX, startY, nextX, nextY);
       const startTime = performance.now();
+      const durationMs = motionDurationMs;
 
       function step(timestamp) {
         const elapsed = timestamp - startTime;
-        const linearProgress = Math.min(elapsed / motionDurationMs, 1);
+        const linearProgress = Math.min(elapsed / durationMs, 1);
         const easedProgress = 1 - Math.pow(1 - linearProgress, 3);
         const inverse = 1 - easedProgress;
         const x = (inverse * inverse * startX)
@@ -376,6 +480,49 @@ resetScores();
       }
 
       target.moveAnimationFrame = window.requestAnimationFrame(step);
+      return durationMs;
+    }
+
+    function animateTargetAlongSpiral(nextX, nextY) {
+      if (target.moveAnimationFrame) {
+        window.cancelAnimationFrame(target.moveAnimationFrame);
+      }
+
+      const startX = currentX;
+      const startY = currentY;
+      const orbitProfile = getRandomOrbitProfile(startX, startY, nextX, nextY);
+      const startTime = performance.now();
+      const durationMs = getSpiralDuration(orbitProfile);
+
+      function step(timestamp) {
+        const elapsed = timestamp - startTime;
+        const linearProgress = Math.min(elapsed / durationMs, 1);
+        const easedProgress = 1 - Math.pow(1 - linearProgress, 3);
+        const angle = orbitProfile.startAngle + (orbitProfile.sweepAngle * easedProgress);
+        const x = clamp(
+          orbitProfile.centerX + (Math.cos(angle) * orbitProfile.radius),
+          0,
+          orbitProfile.bounds.maxX
+        );
+        const y = clamp(
+          orbitProfile.centerY + (Math.sin(angle) * orbitProfile.radius),
+          0,
+          orbitProfile.bounds.maxY
+        );
+
+        setTargetPosition(x, y);
+
+        if (linearProgress < 1) {
+          target.moveAnimationFrame = window.requestAnimationFrame(step);
+          return;
+        }
+
+        target.moveAnimationFrame = null;
+        setTargetPosition(nextX, nextY);
+      }
+
+      target.moveAnimationFrame = window.requestAnimationFrame(step);
+      return durationMs;
     }
 
     function renderScoreboard() {
@@ -451,9 +598,60 @@ resetScores();
       return finalScore > topScores[topScores.length - 1].score;
     }
 
+    function hasClearedScoreboardOnce() {
+      return window.localStorage.getItem(scoreboardClearedKey) === "true";
+    }
+
+    function markScoreboardCleared() {
+      window.localStorage.setItem(scoreboardClearedKey, "true");
+    }
+
+    function clearLocalScoreboard() {
+      topScores = [];
+      window.localStorage.removeItem(localScoresKey);
+      renderScoreboard();
+    }
+
+    function clearFirestoreScoresOnce() {
+      if (!db || hasClearedScoreboardOnce()) {
+        return Promise.resolve();
+      }
+
+      clearLocalScoreboard();
+
+      return db.collection(scoresCollectionName)
+        .get()
+        .then((snapshot) => {
+          if (snapshot.empty) {
+            markScoreboardCleared();
+            return;
+          }
+
+          const batch = db.batch();
+          snapshot.forEach((scoreDoc) => {
+            batch.delete(scoreDoc.ref);
+          });
+
+          return batch.commit().then(() => {
+            markScoreboardCleared();
+          });
+        })
+        .catch((error) => {
+          console.error(error);
+          throw error;
+        });
+    }
+
     function setupFirestore() {
+      if (!hasClearedScoreboardOnce()) {
+        clearLocalScoreboard();
+      }
+
       if (!hasRealFirebaseConfig()) {
         usingFirestore = false;
+        if (!hasClearedScoreboardOnce()) {
+          markScoreboardCleared();
+        }
         loadLocalScores();
         return;
       }
@@ -465,28 +663,34 @@ resetScores();
         db = app.firestore ? app.firestore() : firebase.firestore();
         usingFirestore = true;
 
-        unsubscribeScores = db.collection(scoresCollectionName)
-          .orderBy("score", "desc")
-          .limit(5)
-          .onSnapshot(
-            (snapshot) => {
-              topScores = snapshot.docs.map((doc) => {
-                const data = doc.data();
-                return {
-                  name: data.name || "Anonymous",
-                  score: Number(data.score) || 0
-                };
-              });
-              topScores.sort((a, b) => b.score - a.score);
-              topScores = topScores.slice(0, 5);
-              renderScoreboard();
-            },
-            (error) => {
-              usingFirestore = false;
-              loadLocalScores();
-              console.error(error);
-            }
-          );
+        clearFirestoreScoresOnce()
+          .catch(() => {
+            // Keep the game working even if the one-time cleanup fails.
+          })
+          .finally(() => {
+            unsubscribeScores = db.collection(scoresCollectionName)
+              .orderBy("score", "desc")
+              .limit(5)
+              .onSnapshot(
+                (snapshot) => {
+                  topScores = snapshot.docs.map((doc) => {
+                    const data = doc.data();
+                    return {
+                      name: data.name || "Anonymous",
+                      score: Number(data.score) || 0
+                    };
+                  });
+                  topScores.sort((a, b) => b.score - a.score);
+                  topScores = topScores.slice(0, 5);
+                  renderScoreboard();
+                },
+                (error) => {
+                  usingFirestore = false;
+                  loadLocalScores();
+                  console.error(error);
+                }
+              );
+          });
       } catch (error) {
         usingFirestore = false;
         loadLocalScores();
@@ -520,8 +724,14 @@ resetScores();
 
       const nextPosition = getRandomTargetPosition();
       target.classList.add("running");
+      let animationDuration = motionDurationMs;
       if (useCurve) {
-        animateTargetTo(nextPosition.x, nextPosition.y);
+        if (useSpiralPathNext) {
+          animationDuration = animateTargetAlongSpiral(nextPosition.x, nextPosition.y);
+        } else {
+          animationDuration = animateTargetAlongCurve(nextPosition.x, nextPosition.y);
+        }
+        useSpiralPathNext = !useSpiralPathNext;
       } else {
         if (target.moveAnimationFrame) {
           window.cancelAnimationFrame(target.moveAnimationFrame);
@@ -532,7 +742,7 @@ resetScores();
       window.clearTimeout(target.moveEffectTimeout);
       target.moveEffectTimeout = window.setTimeout(() => {
         target.classList.remove("running");
-      }, motionDurationMs);
+      }, animationDuration);
     }
 
     function finishGame() {
