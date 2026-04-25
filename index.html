@@ -239,7 +239,8 @@
     let currentX = 0;
     let currentY = 0;
 
-    // PASTE YOUR REAL FIREBASE CONFIG HERE
+    // Real Firebase config detected below. If this object is ever removed,
+    // replace it with your real project config instead of placeholder values.
     const firebaseConfig = {
       apiKey: "AIzaSyC-QFKRSQ8IFZE9DopixUOMV4xQJLRig6w",
       authDomain: "square-clicking-game.firebaseapp.com",
@@ -346,8 +347,10 @@
       }
 
       try {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
+        const app = firebase.apps.length
+          ? firebase.app()
+          : firebase.initializeApp(firebaseConfig);
+        db = app.firestore ? app.firestore() : firebase.firestore();
         usingFirestore = true;
         connectionMessage.textContent = "Firebase connected. Top 5 scores are global.";
 
@@ -471,6 +474,7 @@
 
     function resetGame() {
       window.clearInterval(timerId);
+      window.clearTimeout(target.moveEffectTimeout);
       score = 0;
       timeLeft = roundLength;
       timerId = null;
