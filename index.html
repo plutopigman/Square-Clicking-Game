@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Square Click Game</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #dff6ff, #fef6e4);
+      color: #111827;
+    }
+
+    .layout {
+      width: min(1100px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .game {
+      text-align: center;
+    }
+
+    h1,
+    h2 {
+      margin-top: 0;
+      color: #1f2937;
+    }
+
+    .status {
+      min-height: 1.5rem;
+      font-size: 1.05rem;
+      color: #475569;
+    }
+
+    .connection-status {
+      margin-bottom: 8px;
+      color: #b45309;
+    }
+
+    .game-status {
+      margin-bottom: 16px;
+    }
+
+    .hud {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 16px;
+      font-size: 1.15rem;
+      font-weight: bold;
+      flex-wrap: wrap;
+    }
+
+    .play-area {
+      position: relative;
+      width: 100%;
+      height: 70vh;
+      min-height: 420px;
+      border: 3px solid #1f2937;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+    }
+
+    .target {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border: none;
+      border-radius: 10px;
+      background: #ef4444;
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+
+    .target:hover {
+      transform: scale(1.08);
+    }
+
+    .target:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    .scoreboard {
+      padding: 20px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+      text-align: left;
+    }
+
+    .scoreboard ol {
+      margin: 0;
+      padding-left: 24px;
+    }
+
+    .scoreboard li {
+      margin-bottom: 10px;
+      font-weight: bold;
+      color: #1f2937;
+    }
+
+    .empty-score {
+      color: #64748b;
+      font-weight: normal;
+    }
+
+    .replay-button {
+      display: none;
+      margin-top: 16px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 999px;
+      background: #1f2937;
+      color: #ffffff;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .replay-button:hover {
+      background: #111827;
+    }
+
+    @media (max-width: 800px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .scoreboard {
+        order: -1;
+      }
+
+      .play-area {
+        min-height: 360px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <main class="game">
+      <h1>Square Click Game</h1>
+      <div class="status connection-status" id="connectionMessage"></div>
+      <div class="status game-status" id="statusMessage">Click the square to start.</div>
+      <div class="hud">
+        <div>Score: <span id="score">0</span></div>
+        <div>Time: <span id="timeLeft">15</span>s</div>
+      </div>
+      <div class="play-area" id="playArea">
+        <button class="target" id="target" aria-label="Click the square"></button>
+      </div>
+      <button class="replay-button" id="replayButton" type="button">Replay</button>
+    </main>
+
+    <aside class="scoreboard">
+      <h2>Top 5 Scores</h2>
+      <ol id="scoreboardList"></ol>
+    </aside>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
+  <script>
+    const playArea = document.getElementById("playArea");
+    const target = document.getElementById("target");
+    const scoreDisplay = document.getElementById("score");
+    const timeLeftDisplay = document.getElementById("timeLeft");
+    const connectionMessage = document.getElementById("connectionMessage");
+    const statusMessage = document.getElementById("statusMessage");
+    const scoreboardList = document.getElementById("scoreboardList");
+    const replayButton = document.getElementById("replayButton");
+
+    const targetSize = 60;
+    const roundLength = 15;
+    const scoresCollectionName = "scores";
+    const localScoresKey = "square-click-top-5-local";
+
+    let score = 0;
+    let timeLeft = roundLength;
+    let timerId = null;
+    let gameStarted = false;
+    let gameOver = false;
+    let topScores = [];
+    let db = null;
+    let usingFirestore = false;
+    let unsubscribeScores = null;
+
+    // PASTE YOUR REAL FIREBASE CONFIG HERE
+    const firebaseConfig = {
+      apiKey: "AIzaSyC-QFKRSQ8IFZE9DopixUOMV4xQJLRig6w",
+      authDomain: "square-clicking-game.firebaseapp.com",
+      projectId: "square-clicking-game",
+      storageBucket: "square-clicking-game.firebasestorage.app",
+      messagingSenderId: "724285223780",
+      appId: "1:724285223780:web:0908ed42d3e80dbbf6c071",
+      measurementId: "G-CJ8QPHYMVE"
+    };
+
+    function hasRealFirebaseConfig() {
+      return Object.values(firebaseConfig).every(
+        (value) => typeof value === "string" && !value.startsWith("PASTE_YOUR_")
+      );
+    }
+
+    function renderTimer() {
+      timeLeftDisplay.textContent = timeLeft;
+    }
+
+    function renderScore() {
+      scoreDisplay.textContent = score;
+    }
+
+    function renderScoreboard() {
+      scoreboardList.innerHTML = "";
+
+      if (topScores.length === 0) {
+        const emptyItem = document.createElement("li");
+        emptyItem.className = "empty-score";
+        emptyItem.textContent = "No scores yet";
+        scoreboardList.appendChild(emptyItem);
+        return;
+      }
+
+      topScores.forEach((entry) => {
+        const item = document.createElement("li");
+        item.textContent = entry.name + " - " + entry.score;
+        scoreboardList.appendChild(item);
+      });
+    }
+
+    function loadLocalScores() {
+      try {
+        const savedScores = window.localStorage.getItem(localScoresKey);
+        if (!savedScores) {
+          topScores = [];
+          renderScoreboard();
+          return;
+        }
+
+        const parsedScores = JSON.parse(savedScores);
+        if (!Array.isArray(parsedScores)) {
+          topScores = [];
+          renderScoreboard();
+          return;
+        }
+
+        topScores = parsedScores
+          .map((entry) => ({
+            name: entry.name || "Anonymous",
+            score: Number(entry.score) || 0
+          }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5);
+
+        renderScoreboard();
+      } catch (error) {
+        topScores = [];
+        renderScoreboard();
+        console.error(error);
+      }
+    }
+
+    function saveLocalScores() {
+      window.localStorage.setItem(localScoresKey, JSON.stringify(topScores));
+    }
+
+    function addLocalScore(playerName, finalScore) {
+      topScores.push({
+        name: playerName,
+        score: finalScore
+      });
+      topScores.sort((a, b) => b.score - a.score);
+      topScores = topScores.slice(0, 5);
+      saveLocalScores();
+      renderScoreboard();
+    }
+
+    function qualifiesForTopFive(finalScore) {
+      if (topScores.length < 5) {
+        return true;
+      }
+
+      return finalScore > topScores[topScores.length - 1].score;
+    }
+
+    function setupFirestore() {
+      if (!hasRealFirebaseConfig()) {
+        usingFirestore = false;
+        connectionMessage.textContent = "Firebase not connected yet. Scores are local only.";
+        loadLocalScores();
+        return;
+      }
+
+      try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        usingFirestore = true;
+        connectionMessage.textContent = "Firebase connected. Top 5 scores are global.";
+
+        unsubscribeScores = db.collection(scoresCollectionName)
+          .orderBy("score", "desc")
+          .limit(5)
+          .onSnapshot(
+            (snapshot) => {
+              topScores = snapshot.docs.map((doc) => {
+                const data = doc.data();
+                return {
+                  name: data.name || "Anonymous",
+                  score: Number(data.score) || 0
+                };
+              });
+              renderScoreboard();
+            },
+            (error) => {
+              usingFirestore = false;
+              connectionMessage.textContent = "Firebase not connected yet. Scores are local only.";
+              loadLocalScores();
+              console.error(error);
+            }
+          );
+      } catch (error) {
+        usingFirestore = false;
+        connectionMessage.textContent = "Firebase not connected yet. Scores are local only.";
+        loadLocalScores();
+        console.error(error);
+      }
+    }
+
+    function saveScore(playerName, finalScore) {
+      if (!usingFirestore || !db) {
+        addLocalScore(playerName, finalScore);
+        return Promise.resolve();
+      }
+
+      return db.collection(scoresCollectionName)
+        .add({
+          name: playerName,
+          score: finalScore,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        })
+        .catch((error) => {
+          usingFirestore = false;
+          connectionMessage.textContent = "Firebase not connected yet. Scores are local only.";
+          addLocalScore(playerName, finalScore);
+          throw error;
+        });
+    }
+
+    function moveTarget() {
+      if (gameOver) {
+        return;
+      }
+
+      const maxX = playArea.clientWidth - targetSize;
+      const maxY = playArea.clientHeight - targetSize;
+      const randomX = Math.floor(Math.random() * Math.max(maxX, 1));
+      const randomY = Math.floor(Math.random() * Math.max(maxY, 1));
+
+      target.style.left = randomX + "px";
+      target.style.top = randomY + "px";
+    }
+
+    function finishGame() {
+      if (gameOver) {
+        return;
+      }
+
+      gameOver = true;
+      window.clearInterval(timerId);
+      target.disabled = true;
+      replayButton.style.display = "inline-block";
+
+      if (qualifiesForTopFive(score)) {
+        const enteredName = window.prompt("You made the Top 5! Enter your name:", "Player");
+        const playerName = enteredName === null ? "Anonymous" : enteredName.trim() || "Anonymous";
+        saveScore(playerName, score)
+          .then(() => {
+            statusMessage.textContent = "Game over. " + playerName + " entered the Top 5 with " + score + ".";
+          })
+          .catch((error) => {
+            statusMessage.textContent = "Game over. Firestore failed, so the score was saved locally instead.";
+            console.error(error);
+          });
+        return;
+      }
+
+      statusMessage.textContent = "Game over. Final score: " + score + ".";
+    }
+
+    function startTimer() {
+      if (gameStarted) {
+        return;
+      }
+
+      gameStarted = true;
+      statusMessage.textContent = "Go!";
+
+      timerId = window.setInterval(() => {
+        timeLeft -= 1;
+        renderTimer();
+
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          renderTimer();
+          finishGame();
+        }
+      }, 1000);
+    }
+
+    function resetGame() {
+      window.clearInterval(timerId);
+      score = 0;
+      timeLeft = roundLength;
+      timerId = null;
+      gameStarted = false;
+      gameOver = false;
+      target.disabled = false;
+      replayButton.style.display = "none";
+      statusMessage.textContent = "Click the square to start.";
+      renderScore();
+      renderTimer();
+      moveTarget();
+    }
+
+    target.addEventListener("click", () => {
+      if (gameOver) {
+        return;
+      }
+
+      if (!gameStarted) {
+        startTimer();
+      }
+
+      score += 1;
+      renderScore();
+      moveTarget();
+    });
+
+    replayButton.addEventListener("click", resetGame);
+
+    renderScoreboard();
+    renderScore();
+    renderTimer();
+    setupFirestore();
+    window.addEventListener("load", moveTarget);
+    window.addEventListener("resize", moveTarget);
+  </script>
+</body>
+</html>
