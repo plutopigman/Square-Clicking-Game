@@ -247,6 +247,18 @@
       measurementId: "G-CJ8QPHYMVE"
     };
 
+    //================================reset scoreboard====================================
+    import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
+
+      async function resetScores() {
+      const querySnapshot = await getDocs(collection(db, "scores"));
+      querySnapshot.forEach(async (document) => {
+      await deleteDoc(doc(db, "scores", document.id));
+      });
+    }
+    //=====================================================================================
+resetScores();
+
     function hasRealFirebaseConfig() {
       return Object.values(firebaseConfig).every(
         (value) => typeof value === "string" && !value.startsWith("PASTE_YOUR_")
