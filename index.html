@@ -17,13 +17,9 @@
       justify-content: center;
       padding: 24px;
       font-family: Arial, sans-serif;
-<<<<<<< HEAD
       background:
         radial-gradient(circle at top left, rgba(255, 255, 255, 0.8), transparent 34%),
         linear-gradient(135deg, #dff6ff, #fef6e4 52%, #fde68a);
-=======
-      background: linear-gradient(135deg, #dff6ff, #fef6e4);
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
       color: #111827;
     }
 
@@ -46,16 +42,11 @@
     }
 
     .status {
-<<<<<<< HEAD
-=======
-      margin-bottom: 16px;
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
       min-height: 1.5rem;
       font-size: 1.05rem;
       color: #475569;
     }
 
-<<<<<<< HEAD
     .connection-status {
       margin-bottom: 8px;
       color: #b45309;
@@ -65,8 +56,6 @@
       margin-bottom: 16px;
     }
 
-=======
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     .hud {
       display: flex;
       justify-content: center;
@@ -83,7 +72,6 @@
       height: 70vh;
       min-height: 420px;
       border: 3px solid #1f2937;
-<<<<<<< HEAD
       border-radius: 24px;
       background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.8)),
@@ -92,12 +80,6 @@
       box-shadow:
         0 26px 55px rgba(15, 23, 42, 0.18),
         inset 0 1px 0 rgba(255, 255, 255, 0.75);
-=======
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.82);
-      overflow: hidden;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     }
 
     .target {
@@ -105,7 +87,6 @@
       width: 60px;
       height: 60px;
       border: none;
-<<<<<<< HEAD
       left: 0;
       top: 0;
       border-radius: 18px;
@@ -129,22 +110,11 @@
         inset 0 1px 0 rgba(255, 255, 255, 0.5),
         inset 0 -4px 10px rgba(127, 29, 29, 0.32);
       filter: saturate(1.08);
-=======
-      border-radius: 10px;
-      background: #ef4444;
-      cursor: pointer;
-      transition: transform 0.12s ease;
-    }
-
-    .target:hover {
-      transform: scale(1.08);
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     }
 
     .target:disabled {
       cursor: not-allowed;
       opacity: 0.55;
-<<<<<<< HEAD
       filter: grayscale(0.1);
     }
 
@@ -153,24 +123,15 @@
         0 24px 38px rgba(239, 68, 68, 0.34),
         inset 0 1px 0 rgba(255, 255, 255, 0.45),
         inset 0 -4px 10px rgba(127, 29, 29, 0.3);
-=======
-      transform: none;
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     }
 
     .scoreboard {
       padding: 20px;
-<<<<<<< HEAD
       border-radius: 24px;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.82));
       box-shadow:
         0 24px 48px rgba(15, 23, 42, 0.14),
         inset 0 1px 0 rgba(255, 255, 255, 0.8);
-=======
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.82);
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
       text-align: left;
     }
 
@@ -181,17 +142,12 @@
 
     .scoreboard li {
       margin-bottom: 10px;
-<<<<<<< HEAD
       padding: 10px 12px;
       border-radius: 14px;
       font-weight: bold;
       color: #1f2937;
       background: rgba(248, 250, 252, 0.85);
       box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
-=======
-      font-weight: bold;
-      color: #1f2937;
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     }
 
     .empty-score {
@@ -199,7 +155,6 @@
       font-weight: normal;
     }
 
-<<<<<<< HEAD
     .replay-button {
       display: none;
       margin-top: 16px;
@@ -217,8 +172,6 @@
       background: #111827;
     }
 
-=======
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     @media (max-width: 800px) {
       .layout {
         grid-template-columns: 1fr;
@@ -238,12 +191,8 @@
   <div class="layout">
     <main class="game">
       <h1>Square Click Game</h1>
-<<<<<<< HEAD
       <div class="status connection-status" id="connectionMessage"></div>
       <div class="status game-status" id="statusMessage">Click the square to start.</div>
-=======
-      <div class="status" id="statusMessage">Click the square to start.</div>
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
       <div class="hud">
         <div>Score: <span id="score">0</span></div>
         <div>Time: <span id="timeLeft">15</span>s</div>
@@ -251,10 +200,7 @@
       <div class="play-area" id="playArea">
         <button class="target" id="target" aria-label="Click the square"></button>
       </div>
-<<<<<<< HEAD
       <button class="replay-button" id="replayButton" type="button">Replay</button>
-=======
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     </main>
 
     <aside class="scoreboard">
@@ -270,24 +216,16 @@
     const target = document.getElementById("target");
     const scoreDisplay = document.getElementById("score");
     const timeLeftDisplay = document.getElementById("timeLeft");
-<<<<<<< HEAD
     const connectionMessage = document.getElementById("connectionMessage");
     const statusMessage = document.getElementById("statusMessage");
     const scoreboardList = document.getElementById("scoreboardList");
     const replayButton = document.getElementById("replayButton");
-=======
-    const statusMessage = document.getElementById("statusMessage");
-    const scoreboardList = document.getElementById("scoreboardList");
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
 
     const targetSize = 60;
     const roundLength = 15;
     const scoresCollectionName = "scores";
-<<<<<<< HEAD
     const localScoresKey = "square-click-top-5-local";
     const motionDurationMs = 350;
-=======
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
 
     let score = 0;
     let timeLeft = roundLength;
@@ -296,7 +234,6 @@
     let gameOver = false;
     let topScores = [];
     let db = null;
-<<<<<<< HEAD
     let usingFirestore = false;
     let unsubscribeScores = null;
     let currentX = 0;
@@ -311,17 +248,6 @@
       messagingSenderId: "724285223780",
       appId: "1:724285223780:web:0908ed42d3e80dbbf6c071",
       measurementId: "G-CJ8QPHYMVE"
-=======
-
-    // Paste your entire firebaseConfig object right here, replacing the placeholder values below.
-    const firebaseConfig = {
-      apiKey: "PASTE_YOUR_API_KEY_HERE",
-      authDomain: "PASTE_YOUR_AUTH_DOMAIN_HERE",
-      projectId: "PASTE_YOUR_PROJECT_ID_HERE",
-      storageBucket: "PASTE_YOUR_STORAGE_BUCKET_HERE",
-      messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID_HERE",
-      appId: "PASTE_YOUR_APP_ID_HERE"
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     };
 
     function hasRealFirebaseConfig() {
@@ -356,7 +282,6 @@
       });
     }
 
-<<<<<<< HEAD
     function loadLocalScores() {
       try {
         const savedScores = window.localStorage.getItem(localScoresKey);
@@ -404,8 +329,6 @@
       renderScoreboard();
     }
 
-=======
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     function qualifiesForTopFive(finalScore) {
       if (topScores.length < 5) {
         return true;
@@ -416,7 +339,6 @@
 
     function setupFirestore() {
       if (!hasRealFirebaseConfig()) {
-<<<<<<< HEAD
         usingFirestore = false;
         connectionMessage.textContent = "Firebase not connected yet. Scores are local only.";
         loadLocalScores();
@@ -478,48 +400,6 @@
           addLocalScore(playerName, finalScore);
           throw error;
         });
-=======
-        statusMessage.textContent = "Click the square to start. Paste your firebaseConfig to enable the global Top 5.";
-        renderScoreboard();
-        return;
-      }
-
-      firebase.initializeApp(firebaseConfig);
-      db = firebase.firestore();
-
-      db.collection(scoresCollectionName)
-        .orderBy("score", "desc")
-        .limit(5)
-        .onSnapshot(
-          (snapshot) => {
-            topScores = snapshot.docs.map((doc) => {
-              const data = doc.data();
-              return {
-                name: data.name || "Anonymous",
-                score: Number(data.score) || 0
-              };
-            });
-            renderScoreboard();
-          },
-          (error) => {
-            statusMessage.textContent = "Firestore could not load the Top 5. Check your firebaseConfig and rules.";
-            console.error(error);
-          }
-        );
-    }
-
-    function saveScore(playerName, finalScore) {
-      if (!db) {
-        statusMessage.textContent = "Score not saved because Firebase is not configured yet.";
-        return Promise.resolve();
-      }
-
-      return db.collection(scoresCollectionName).add({
-        name: playerName,
-        score: finalScore,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     }
 
     function moveTarget() {
@@ -532,7 +412,6 @@
       const randomX = Math.floor(Math.random() * Math.max(maxX, 1));
       const randomY = Math.floor(Math.random() * Math.max(maxY, 1));
 
-<<<<<<< HEAD
       currentX = randomX;
       currentY = randomY;
       target.classList.add("running");
@@ -541,10 +420,6 @@
       target.moveEffectTimeout = window.setTimeout(() => {
         target.classList.remove("running");
       }, motionDurationMs);
-=======
-      target.style.left = randomX + "px";
-      target.style.top = randomY + "px";
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     }
 
     function finishGame() {
@@ -555,27 +430,17 @@
       gameOver = true;
       window.clearInterval(timerId);
       target.disabled = true;
-<<<<<<< HEAD
       replayButton.style.display = "inline-block";
-=======
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
 
       if (qualifiesForTopFive(score)) {
         const enteredName = window.prompt("You made the Top 5! Enter your name:", "Player");
         const playerName = enteredName === null ? "Anonymous" : enteredName.trim() || "Anonymous";
         saveScore(playerName, score)
           .then(() => {
-<<<<<<< HEAD
             statusMessage.textContent = "Game over. " + playerName + " entered the Top 5 with " + score + ".";
           })
           .catch((error) => {
             statusMessage.textContent = "Game over. Firestore failed, so the score was saved locally instead.";
-=======
-            statusMessage.textContent = "Game over. " + playerName + " entered the global Top 5 with " + score + ".";
-          })
-          .catch((error) => {
-            statusMessage.textContent = "Game over, but the score could not be saved to Firestore.";
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
             console.error(error);
           });
         return;
@@ -604,7 +469,6 @@
       }, 1000);
     }
 
-<<<<<<< HEAD
     function resetGame() {
       window.clearInterval(timerId);
       score = 0;
@@ -620,8 +484,6 @@
       moveTarget();
     }
 
-=======
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     target.addEventListener("click", () => {
       if (gameOver) {
         return;
@@ -636,11 +498,8 @@
       moveTarget();
     });
 
-<<<<<<< HEAD
     replayButton.addEventListener("click", resetGame);
 
-=======
->>>>>>> f58c5d47ffedfac1ea0f3448be0d2ecc4ce5deac
     renderScoreboard();
     renderScore();
     renderTimer();
