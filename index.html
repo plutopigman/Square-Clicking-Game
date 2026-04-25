@@ -221,7 +221,6 @@
     const roundLength = 15;
     const scoresCollectionName = "scores";
     const localScoresKey = "square-click-top-5-local";
-    const scoreboardClearedKey = "square-click-scoreboard-cleared-v1";
     const motionDurationMs = 350;
     const spiralDurationMaxMs = 900;
 
@@ -598,60 +597,9 @@
       return finalScore > topScores[topScores.length - 1].score;
     }
 
-    function hasClearedScoreboardOnce() {
-      return window.localStorage.getItem(scoreboardClearedKey) === "true";
-    }
-
-    function markScoreboardCleared() {
-      window.localStorage.setItem(scoreboardClearedKey, "true");
-    }
-
-    function clearLocalScoreboard() {
-      topScores = [];
-      window.localStorage.removeItem(localScoresKey);
-      renderScoreboard();
-    }
-
-    function clearFirestoreScoresOnce() {
-      if (!db || hasClearedScoreboardOnce()) {
-        return Promise.resolve();
-      }
-
-      clearLocalScoreboard();
-
-      return db.collection(scoresCollectionName)
-        .get()
-        .then((snapshot) => {
-          if (snapshot.empty) {
-            markScoreboardCleared();
-            return;
-          }
-
-          const batch = db.batch();
-          snapshot.forEach((scoreDoc) => {
-            batch.delete(scoreDoc.ref);
-          });
-
-          return batch.commit().then(() => {
-            markScoreboardCleared();
-          });
-        })
-        .catch((error) => {
-          console.error(error);
-          throw error;
-        });
-    }
-
     function setupFirestore() {
-      if (!hasClearedScoreboardOnce()) {
-        clearLocalScoreboard();
-      }
-
       if (!hasRealFirebaseConfig()) {
         usingFirestore = false;
-        if (!hasClearedScoreboardOnce()) {
-          markScoreboardCleared();
-        }
         loadLocalScores();
         return;
       }
@@ -663,34 +611,28 @@
         db = app.firestore ? app.firestore() : firebase.firestore();
         usingFirestore = true;
 
-        clearFirestoreScoresOnce()
-          .catch(() => {
-            // Keep the game working even if the one-time cleanup fails.
-          })
-          .finally(() => {
-            unsubscribeScores = db.collection(scoresCollectionName)
-              .orderBy("score", "desc")
-              .limit(5)
-              .onSnapshot(
-                (snapshot) => {
-                  topScores = snapshot.docs.map((doc) => {
-                    const data = doc.data();
-                    return {
-                      name: data.name || "Anonymous",
-                      score: Number(data.score) || 0
-                    };
-                  });
-                  topScores.sort((a, b) => b.score - a.score);
-                  topScores = topScores.slice(0, 5);
-                  renderScoreboard();
-                },
-                (error) => {
-                  usingFirestore = false;
-                  loadLocalScores();
-                  console.error(error);
-                }
-              );
-          });
+        unsubscribeScores = db.collection(scoresCollectionName)
+          .orderBy("score", "desc")
+          .limit(5)
+          .onSnapshot(
+            (snapshot) => {
+              topScores = snapshot.docs.map((doc) => {
+                const data = doc.data();
+                return {
+                  name: data.name || "Anonymous",
+                  score: Number(data.score) || 0
+                };
+              });
+              topScores.sort((a, b) => b.score - a.score);
+              topScores = topScores.slice(0, 5);
+              renderScoreboard();
+            },
+            (error) => {
+              usingFirestore = false;
+              loadLocalScores();
+              console.error(error);
+            }
+          );
       } catch (error) {
         usingFirestore = false;
         loadLocalScores();
